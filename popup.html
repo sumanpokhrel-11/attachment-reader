@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 320px;
+            padding: 0;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            margin: 4px 0 0 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .toggle-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .toggle-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #202124;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background: #4285f4;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(20px);
+        }
+        
+        .feature-list {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            overflow: hidden;
+        }
+        
+        .feature-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .feature-item:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-icon {
+            font-size: 16px;
+        }
+        
+        .feature-text {
+            font-size: 13px;
+            color: #5f6368;
+            line-height: 1.4;
+        }
+        
+        .stats {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: #e8f0fe;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stats-number {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a73e8;
+            display: block;
+        }
+        
+        .stats-label {
+            font-size: 11px;
+            color: #5f6368;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: #9aa0a6;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 16px;
+        }
+        
+        .version {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📄 Attachment Visualizer</h1>
+        <p>View .md and .json files instantly</p>
+    </div>
+    
+    <div class="content">
+        <div class="toggle-section">
+            <span class="toggle-label">Extension Enabled</span>
+            <div class="toggle-switch active" id="enableToggle">
+                <div class="toggle-slider"></div>
+            </div>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <span class="feature-icon">🎯</span>
+                <span class="feature-text">Click any .md or .json attachment to visualize</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🎨</span>
+                <span class="feature-text">Beautiful formatting with syntax highlighting</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">⚡</span>
+                <span class="feature-text">Works with Gmail, Outlook, and more</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🔒</span>
+                <span class="feature-text">Secure - files are processed locally</span>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <span class="stats-number" id="filesViewed">0</span>
+            <span class="stats-label">Files Visualized Today</span>
+        </div>
+        
+        <div class="footer">
+            <div class="version">v1.0.0</div>
+            Made with ❤️ for better email productivity
+        </div>
+    </div>
+    
+    <script>
+        // Initialize popup
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('enableToggle');
+            const filesViewedElement = document.getElementById('filesViewed');
+            
+            // Load current settings
+            chrome.storage.sync.get(['extensionEnabled', 'filesViewedToday'], function(result) {
+                const isEnabled = result.extensionEnabled !== false;
+                const filesViewed = result.filesViewedToday || 0;
+                
+                toggle.classList.toggle('active', isEnabled);
+                filesViewedElement.textContent = filesViewed;
+            });
+            
+            // Toggle functionality
+                            toggle.addEventListener('click', function() {
+                const isCurrentlyActive = toggle.classList.contains('active');
+                const newState = !isCurrentlyActive;
+                
+                toggle.classList.toggle('active', newState);
+                
+                chrome.storage.sync.set({ extensionEnabled: newState }, function() {
+                    if (chrome.runtime.lastError) {
+                        console.error('Error saving setting:', chrome.runtime.lastError);
+                        return;
+                    }
+                    
+                    console.log('Extension', newState ? 'enabled' : 'disabled');
+                    
+                    // Notify all tabs about the state change
+                    chrome.tabs.query({}, function(tabs) {
+                        tabs.forEach(tab => {
+                            if (tab.url && (tab.url.includes('mail.google.com') || tab.url.includes('outlook'))) {
+                                chrome.tabs.sendMessage(tab.id, {
+                                    action: 'toggleExtension',
+                                    enabled: newState
+                                }).catch(err => {
+                                    // Ignore errors for tabs that don't have our content script
+                                });
+                            }
+                        });
+                    });
+                    
+                    // Update UI feedback
+                    const statusText = document.createElement('div');
+                    statusText.style.cssText = `
+                        position: fixed;
+                        top: 10px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background: ${newState ? '#137333' : '#d93025'};
+                        color: white;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        z-index: 1000;
+                    `;
+                    statusText.textContent = `Extension ${newState ? 'Enabled' : 'Disabled'}`;
+                    document.body.appendChild(statusText);
+                    
+                    setTimeout(() => {
+                        if (statusText.parentNode) {
+                            statusText.remove();
+                        }
+                    }, 2000);
+                });
+            });
+            
+            // Add refresh button
+            const refreshBtn = document.createElement('button');
+            refreshBtn.textContent = '🔄 Refresh Gmail';
+            refreshBtn.style.cssText = `
+                width: 100%;
+                margin-top: 16px;
+                padding: 8px;
+                background: #f8f9fa;
+                border: 1px solid #dadce0;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            refreshBtn.addEventListener('click', function() {
+                chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                    const currentTab = tabs[0];
+                    if (currentTab && currentTab.url && currentTab.url.includes('mail.google.com')) {
+                        chrome.tabs.reload(currentTab.id);
+                        window.close();
+                    }
+                });
+            });
+            
+            document.querySelector('.content').appendChild(refreshBtn);
+    });
+    </script>
+</body>
+</html>

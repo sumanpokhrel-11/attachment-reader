@@ -349,16 +349,48 @@
         overlay.appendChild(viewer);
         document.body.appendChild(overlay);
         
-        // Add event listeners
-        document.getElementById('av-close-btn').addEventListener('click', closeViewer);
-        document.getElementById('av-copy-btn').addEventListener('click', () => copyContent(content));
-        document.getElementById('av-download-btn').addEventListener('click', () => downloadFile(content, filename));
-        
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) closeViewer();
-        });
-        
-        document.addEventListener('keydown', handleKeyDown);
+        // FIXED: Add event listeners AFTER elements are in DOM and use proper event delegation
+        setTimeout(() => {
+            const copyBtn = document.getElementById('av-copy-btn');
+            const downloadBtn = document.getElementById('av-download-btn');
+            const closeBtn = document.getElementById('av-close-btn');
+            
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    copyContent(content);
+                });
+            }
+            
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    downloadFile(content, filename);
+                });
+            }
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeViewer();
+                });
+            }
+            
+            // Click outside to close
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    closeViewer();
+                }
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyDown);
+            
+            console.log('Event listeners attached successfully');
+        }, 100);
     }
     
     // Get appropriate icon for file type
@@ -379,8 +411,10 @@
         return div.innerHTML;
     }
     
-    // Enhanced markdown parser with better handling of definition lists and inline content
+    // FIXED: Enhanced markdown parser - better paragraph detection and processing
     function parseMarkdown(content) {
+        console.log('Parsing markdown content:', content.substring(0, 200) + '...');
+        
         // Normalize line endings and split into lines
         const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
         const blocks = [];
@@ -428,55 +462,13 @@
                 continue;
             }
             
-            // Check for table rows (lines with multiple pipes - at least 2 pipes for a real table)
-            if (trimmedLine.includes('|') && (trimmedLine.match(/\|/g) || []).length >= 2) {
-                // Additional check: make sure it's not just a definition with a single pipe
-                const pipeCount = (trimmedLine.match(/\|/g) || []).length;
-                const colonCount = (trimmedLine.match(/:/g) || []).length;
-                
-                // If it has multiple pipes OR if it's clearly a table structure, treat as table
-                if (pipeCount >= 2 || (pipeCount >= 1 && colonCount === 0 && trimmedLine.indexOf('|') > 0 && trimmedLine.indexOf('|') < trimmedLine.length - 1)) {
-                    if (!inTable) {
-                        // Starting a new table
-                        if (currentBlock.length > 0) {
-                            blocks.push({ type: 'paragraph', content: currentBlock.join('\n') });
-                            currentBlock = [];
-                        }
-                        inTable = true;
-                        tableLines = [];
-                    }
-                    tableLines.push(line);
-                    continue;
-                }
-            } else if (inTable && trimmedLine === '') {
-                // Empty line might end the table, but let's be lenient
-                tableLines.push(line);
-                continue;
-            } else if (inTable) {
-                // Non-table line ends the table
-                blocks.push({ type: 'table', content: tableLines });
-                tableLines = [];
-                inTable = false;
-                // Continue processing this line
-            }
-            
-            // Handle headers
+            // Handle headers BEFORE other checks
             if (trimmedLine.match(/^#{1,6}\s/)) {
                 if (currentBlock.length > 0) {
                     blocks.push({ type: 'paragraph', content: currentBlock.join('\n') });
                     currentBlock = [];
                 }
                 blocks.push({ type: 'header', content: line });
-                continue;
-            }
-            
-            // Handle definition lists (like "Label: content")
-            if (trimmedLine.match(/^[^:]+:\s*\S/)) {
-                if (currentBlock.length > 0) {
-                    blocks.push({ type: 'paragraph', content: currentBlock.join('\n') });
-                    currentBlock = [];
-                }
-                blocks.push({ type: 'definition', content: line });
                 continue;
             }
             
@@ -490,10 +482,28 @@
                 continue;
             }
             
+            // Check for table rows
+            if (trimmedLine.includes('|') && (trimmedLine.match(/\|/g) || []).length >= 2) {
+                if (!inTable) {
+                    if (currentBlock.length > 0) {
+                        blocks.push({ type: 'paragraph', content: currentBlock.join('\n') });
+                        currentBlock = [];
+                    }
+                    inTable = true;
+                    tableLines = [];
+                }
+                tableLines.push(line);
+                continue;
+            } else if (inTable) {
+                blocks.push({ type: 'table', content: tableLines });
+                tableLines = [];
+                inTable = false;
+                // Continue processing this line
+            }
+            
             // Handle empty lines (paragraph breaks)
             if (trimmedLine === '') {
                 if (currentBlock.length > 0) {
-                    // Determine block type
                     if (isListContent(currentBlock)) {
                         blocks.push({ type: 'list', content: currentBlock.join('\n') });
                     } else {
@@ -504,7 +514,7 @@
                 continue;
             }
             
-            // Regular content line
+            // Regular content line - add to current paragraph block
             currentBlock.push(line);
         }
         
@@ -519,6 +529,8 @@
             }
         }
         
+        console.log('Processed blocks:', blocks);
+        
         // Convert blocks to HTML
         const htmlBlocks = blocks.map(block => {
             switch (block.type) {
@@ -530,38 +542,39 @@
                     return formatTable(block.content);
                 case 'list':
                     return formatList(block.content);
-                case 'definition':
-                    return formatDefinition(block.content);
                 case 'paragraph':
                 default:
                     return formatParagraph(block.content);
             }
         }).filter(html => html.trim() !== '');
         
-        return htmlBlocks.join('\n');
+        const result = htmlBlocks.join('\n');
+        console.log('Final HTML result:', result.substring(0, 300) + '...');
+        return result;
     }
     
-    // Format definition list items (like "Label: content")
-    function formatDefinition(content) {
+    // FIXED: Format paragraph - ensure all paragraph text is properly rendered
+    function formatParagraph(content) {
         const trimmed = content.trim();
-        const colonIndex = trimmed.indexOf(':');
+        if (!trimmed) return '';
         
-        if (colonIndex === -1) {
-            return `<p>${processInlineFormatting(trimmed)}</p>`;
-        }
+        console.log('Formatting paragraph:', trimmed.substring(0, 100) + '...');
         
-        const label = trimmed.substring(0, colonIndex).trim();
-        const value = trimmed.substring(colonIndex + 1).trim();
+        // Split into lines and clean them up, but preserve meaningful content
+        const lines = trimmed.split('\n')
+            .map(line => line.trim())
+            .filter(line => line && !line.match(/^#{1,6}\s/) && !line.match(/^[\*\-\+]\s/) && !line.match(/^\d+\.\s/));
         
-        if (!value) {
-            // Just the label, no content after colon
-            return `<p><strong>${processInlineFormatting(label)}:</strong></p>`;
-        }
+        if (lines.length === 0) return '';
         
-        return `<div class="av-definition">
-            <strong class="av-def-label">${processInlineFormatting(label)}:</strong>
-            <span class="av-def-value">${processInlineFormatting(value)}</span>
-        </div>`;
+        // Join all lines into a single paragraph with spaces
+        const paragraphText = lines.join(' ');
+        
+        if (!paragraphText.trim()) return '';
+        
+        const formatted = `<p>${processInlineFormatting(paragraphText)}</p>`;
+        console.log('Formatted paragraph:', formatted.substring(0, 100) + '...');
+        return formatted;
     }
     
     // Helper function to check if content is list-like
@@ -574,7 +587,11 @@
     // Format header
     function formatHeader(content) {
         const trimmed = content.trim();
-        if (trimmed.startsWith('### ')) {
+        if (trimmed.startsWith('##### ')) {
+            return `<h5>${processInlineFormatting(trimmed.substring(6))}</h5>`;
+        } else if (trimmed.startsWith('#### ')) {
+            return `<h4>${processInlineFormatting(trimmed.substring(5))}</h4>`;
+        } else if (trimmed.startsWith('### ')) {
             return `<h3>${processInlineFormatting(trimmed.substring(4))}</h3>`;
         } else if (trimmed.startsWith('## ')) {
             return `<h2>${processInlineFormatting(trimmed.substring(3))}</h2>`;
@@ -597,14 +614,13 @@
         if (tableLines.length === 0) return '';
         
         const rows = tableLines.map(line => {
-            // Split by | but preserve escaped pipes
             const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell !== '');
             return cells;
         });
         
         if (rows.length === 0) return '';
         
-        // Check if second row is a separator (contains only -, |, :, and spaces)
+        // Check if second row is a separator
         let headerRowCount = 1;
         if (rows.length > 1 && rows[1].every(cell => /^[\-\:\|\s]+$/.test(cell))) {
             headerRowCount = 1;
@@ -669,32 +685,13 @@
             `<ul>${listItems.join('')}</ul>`;
     }
     
-    // Format paragraph
-    function formatParagraph(content) {
-        const trimmed = content.trim();
-        if (!trimmed) return '';
-        
-        // Split into individual lines and process each
-        const lines = trimmed.split('\n').filter(line => line.trim());
-        if (lines.length === 0) return '';
-        
-        // If it's a single line, make it a paragraph
-        if (lines.length === 1) {
-            return `<p>${processInlineFormatting(lines[0].trim())}</p>`;
-        }
-        
-        // Multiple lines - join with breaks or separate paragraphs
-        const processedLines = lines.map(line => processInlineFormatting(line.trim()));
-        return `<p>${processedLines.join('<br>')}</p>`;
-    }
-    
-    // Process inline formatting (bold, italic, code, links) - improved
+    // Process inline formatting
     function processInlineFormatting(text) {
         if (!text) return '';
         
         let html = escapeHtml(text);
         
-        // Handle inline code first (to protect it from other formatting)
+        // Handle inline code first
         const codeBlocks = [];
         html = html.replace(/`([^`]+)`/g, (match, code) => {
             const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
@@ -702,13 +699,14 @@
             return placeholder;
         });
         
-        // Bold and italic (order matters!)
+        // Bold and italic
         html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
         html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
         
         // Links
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        html = html.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank">$1</a>');
         
         // Restore code blocks
         codeBlocks.forEach((code, index) => {
@@ -731,16 +729,21 @@
     
     // Download file
     function downloadFile(content, filename) {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showNotification('File downloaded!', 'success');
+        try {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification('File downloaded!', 'success');
+        } catch (err) {
+            console.error('Failed to download:', err);
+            showNotification('Failed to download file', 'error');
+        }
     }
     
     // Handle keyboard shortcuts
@@ -750,8 +753,13 @@
                 closeViewer();
             } else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                const content = document.querySelector('.av-content').textContent;
-                copyContent(content);
+                const overlay = document.getElementById('attachment-visualizer-overlay');
+                if (overlay) {
+                    const contentElement = overlay.querySelector('.av-content');
+                    if (contentElement) {
+                        copyContent(contentElement.textContent);
+                    }
+                }
             }
         }
     }
@@ -794,24 +802,17 @@
             let foundAttachment = false;
             
             // First, quickly check if this could possibly be an attachment
-            // Only proceed if we find clear attachment indicators
             while (target && attempts < 5) {
-                // Check for clear attachment indicators
                 const hasAttachmentIndicators = (
-                    // File extension in text content
                     (target.textContent && /\.(md|json|markdown|txt)(\s|$)/i.test(target.textContent)) ||
-                    // File extension in attributes
                     ['title', 'aria-label', 'data-tooltip', 'data-filename'].some(attr => {
                         const value = target.getAttribute(attr) || '';
                         return /\.(md|json|markdown|txt)(\s|$)/i.test(value);
                     }) ||
-                    // Gmail attachment classes/selectors
                     target.classList.contains('aZo') ||
                     target.closest('.aZo') ||
-                    // Download/attachment related attributes
                     target.getAttribute('data-tooltip') === 'Download' ||
                     target.getAttribute('aria-label') === 'Download' ||
-                    // Gmail attachment container
                     target.closest('[data-message-id]')?.querySelector('.aZo')
                 );
                 

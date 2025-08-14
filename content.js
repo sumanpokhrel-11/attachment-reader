@@ -3,6 +3,9 @@
     'use strict';
     
     let isExtensionEnabled = true;
+    let currentViewer = null;
+    let currentContent = '';
+    let currentFilename = '';
     
     // Check if extension is enabled
     chrome.storage.sync.get(['extensionEnabled'], function(result) {
@@ -246,6 +249,10 @@
                 return;
             }
             
+            // Store current content for buttons
+            currentContent = content;
+            currentFilename = filename || 'attachment';
+            
             // Create and show viewer
             createViewer(content, fileExtension, filename || 'attachment');
             
@@ -301,7 +308,7 @@
         return null;
     }
     
-    // Enhanced create viewer function
+    // FIXED: Enhanced create viewer function with proper event handling
     function createViewer(content, fileType, filename) {
         const existing = document.getElementById('attachment-visualizer-overlay');
         if (existing) existing.remove();
@@ -347,34 +354,50 @@
         viewer.appendChild(header);
         viewer.appendChild(contentArea);
         overlay.appendChild(viewer);
+        
+        // Store reference for cleanup
+        currentViewer = overlay;
+        
+        // Add to DOM first
         document.body.appendChild(overlay);
         
-        // FIXED: Add event listeners AFTER elements are in DOM and use proper event delegation
-        setTimeout(() => {
-            const copyBtn = document.getElementById('av-copy-btn');
-            const downloadBtn = document.getElementById('av-download-btn');
-            const closeBtn = document.getElementById('av-close-btn');
+        // FIXED: Add event listeners using direct DOM references and proper error handling
+        setupViewerEventListeners(overlay, content, filename);
+    }
+    
+    // FIXED: Separate function for setting up event listeners with proper error handling
+    function setupViewerEventListeners(overlay, content, filename) {
+        try {
+            const copyBtn = overlay.querySelector('#av-copy-btn');
+            const downloadBtn = overlay.querySelector('#av-download-btn');
+            const closeBtn = overlay.querySelector('#av-close-btn');
             
+            // Copy button
             if (copyBtn) {
-                copyBtn.addEventListener('click', function(e) {
+                copyBtn.addEventListener('click', async function(e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    copyContent(content);
+                    console.log('Copy button clicked');
+                    await copyContent(content);
                 });
             }
             
+            // Download button
             if (downloadBtn) {
                 downloadBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log('Download button clicked');
                     downloadFile(content, filename);
                 });
             }
             
+            // Close button
             if (closeBtn) {
                 closeBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log('Close button clicked');
                     closeViewer();
                 });
             }
@@ -387,10 +410,28 @@
             });
             
             // Keyboard shortcuts
-            document.addEventListener('keydown', handleKeyDown);
+            const keydownHandler = function(e) {
+                if (!document.getElementById('attachment-visualizer-overlay')) {
+                    document.removeEventListener('keydown', keydownHandler);
+                    return;
+                }
+                
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeViewer();
+                } else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    copyContent(content);
+                }
+            };
+            
+            document.addEventListener('keydown', keydownHandler);
             
             console.log('Event listeners attached successfully');
-        }, 100);
+            
+        } catch (error) {
+            console.error('Error setting up event listeners:', error);
+        }
     }
     
     // Get appropriate icon for file type
@@ -411,7 +452,7 @@
         return div.innerHTML;
     }
     
-    // FIXED: Enhanced markdown parser - better paragraph detection and processing
+    // FIXED: Enhanced markdown parser with better text handling
     function parseMarkdown(content) {
         console.log('Parsing markdown content:', content.substring(0, 200) + '...');
         
@@ -587,7 +628,9 @@
     // Format header
     function formatHeader(content) {
         const trimmed = content.trim();
-        if (trimmed.startsWith('##### ')) {
+        if (trimmed.startsWith('###### ')) {
+            return `<h6>${processInlineFormatting(trimmed.substring(7))}</h6>`;
+        } else if (trimmed.startsWith('##### ')) {
             return `<h5>${processInlineFormatting(trimmed.substring(6))}</h5>`;
         } else if (trimmed.startsWith('#### ')) {
             return `<h4>${processInlineFormatting(trimmed.substring(5))}</h4>`;
@@ -716,25 +759,39 @@
         return html;
     }
     
-    // Copy content to clipboard
+    // FIXED: Copy content to clipboard with proper error handling
     async function copyContent(content) {
         try {
-            await navigator.clipboard.writeText(content);
-            showNotification('Content copied to clipboard!', 'success');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(content);
+                showNotification('Content copied to clipboard!', 'success');
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = content;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showNotification('Content copied to clipboard!', 'success');
+            }
         } catch (err) {
             console.error('Failed to copy:', err);
-            showNotification('Failed to copy content', 'error');
+            showNotification('Failed to copy content. Please select and copy manually.', 'error');
         }
     }
     
-    // Download file
+    // FIXED: Download file with proper error handling
     function downloadFile(content, filename) {
         try {
-            const blob = new Blob([content], { type: 'text/plain' });
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
+            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -746,31 +803,15 @@
         }
     }
     
-    // Handle keyboard shortcuts
-    function handleKeyDown(e) {
-        if (document.getElementById('attachment-visualizer-overlay')) {
-            if (e.key === 'Escape') {
-                closeViewer();
-            } else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                const overlay = document.getElementById('attachment-visualizer-overlay');
-                if (overlay) {
-                    const contentElement = overlay.querySelector('.av-content');
-                    if (contentElement) {
-                        copyContent(contentElement.textContent);
-                    }
-                }
-            }
-        }
-    }
-    
-    // Close viewer
+    // FIXED: Close viewer with proper cleanup
     function closeViewer() {
         const overlay = document.getElementById('attachment-visualizer-overlay');
         if (overlay) {
             overlay.remove();
-            document.removeEventListener('keydown', handleKeyDown);
         }
+        currentViewer = null;
+        currentContent = '';
+        currentFilename = '';
     }
     
     // Show notification
@@ -796,6 +837,11 @@
     function interceptAttachmentClicks() {
         document.addEventListener('click', function(e) {
             if (!isExtensionEnabled) return;
+            
+            // Prevent interference with viewer buttons
+            if (e.target.closest('.av-viewer')) {
+                return;
+            }
             
             let target = e.target;
             let attempts = 0;

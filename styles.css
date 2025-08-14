@@ -200,6 +200,11 @@
     overflow: auto;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
+    /* Prevent text selection errors */
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
 }
 
 /* Scrollbar styling */
@@ -235,7 +240,7 @@
     margin: 0;
 }
 
-/* Markdown content */
+/* Markdown content - FIXED PARAGRAPH STYLING */
 .av-markdown {
     color: #333;
     font-size: 14px;
@@ -270,15 +275,37 @@
     font-weight: 600;
 }
 
+.av-markdown h4 {
+    color: #1a73e8;
+    margin-bottom: 10px;
+    margin-top: 20px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.av-markdown h5 {
+    color: #1a73e8;
+    margin-bottom: 8px;
+    margin-top: 16px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* FIXED: Ensure paragraph text is always visible */
 .av-markdown p {
     margin-bottom: 16px;
     margin-top: 0;
-    color: #333;
+    color: #333 !important; /* Force text color */
     line-height: 1.6;
 }
 
 .av-markdown p:last-child {
     margin-bottom: 0;
+}
+
+/* Ensure all text content is visible */
+.av-markdown * {
+    color: inherit;
 }
 
 .av-markdown code {
@@ -318,6 +345,7 @@
 .av-markdown li {
     margin-bottom: 6px;
     line-height: 1.5;
+    color: #333; /* Ensure list items are visible */
 }
 
 .av-markdown li:last-child {
@@ -335,7 +363,7 @@
 
 .av-markdown strong {
     font-weight: 600;
-    color: #202124;
+    color: #202124 !important; /* Ensure bold text is visible */
 }
 
 .av-markdown em {
@@ -383,6 +411,7 @@
     border-right: 1px solid #f0f0f0;
     vertical-align: top;
     line-height: 1.4;
+    color: #333; /* Ensure table text is visible */
 }
 
 .av-table td:last-child {
@@ -395,67 +424,6 @@
 
 .av-table tr:hover {
     background-color: rgba(66, 133, 244, 0.05);
-}
-
-/* Code in tables */
-.av-table code {
-    background: #f1f3f4;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-size: 12px;
-}
-
-/* Links in tables */
-.av-table a {
-    color: #1a73e8;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.av-table a:hover {
-    text-decoration: underline;
-}
-
-/* Strong text in tables */
-.av-table strong {
-    font-weight: 600;
-    color: #1a73e8;
-}
-
-/* Definition list styles */
-.av-definition {
-    margin: 8px 0;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    line-height: 1.5;
-}
-
-.av-def-label {
-    color: #1a73e8;
-    font-weight: 600;
-    min-width: fit-content;
-    flex-shrink: 0;
-}
-
-.av-def-value {
-    color: #333;
-    flex: 1;
-}
-
-/* Improve spacing between different block types */
-.av-markdown h1 + p,
-.av-markdown h2 + p,
-.av-markdown h3 + p {
-    margin-top: 8px;
-}
-
-.av-markdown p + h2 {
-    margin-top: 32px;
-}
-
-.av-markdown p + h3 {
-    margin-top: 24px;
 }
 
 /* Text content */
@@ -537,7 +505,7 @@
     }
 }
 
-/* Dark mode support */
+/* FIXED: Dark mode support with proper text visibility */
 @media (prefers-color-scheme: dark) {
     .av-viewer {
         background: #2d2d30;
@@ -577,9 +545,30 @@
         color: #cccccc;
     }
     
-    .av-markdown h1, .av-markdown h2, .av-markdown h3 {
+    .av-markdown h1, .av-markdown h2, .av-markdown h3, .av-markdown h4, .av-markdown h5 {
         color: #64b5f6;
         border-color: #404040;
+    }
+    
+    /* FIXED: Ensure paragraph text is white in dark mode */
+    .av-markdown p {
+        color: #cccccc !important;
+    }
+    
+    .av-markdown li {
+        color: #cccccc !important;
+    }
+    
+    .av-markdown strong {
+        color: #ffffff !important;
+    }
+    
+    .av-markdown em {
+        color: #b0b0b0 !important;
+    }
+    
+    .av-table td {
+        color: #cccccc !important;
     }
     
     .av-markdown code {
@@ -597,7 +586,27 @@
         color: #64b5f6;
     }
     
-    .av-markdown strong {
+    .av-markdown blockquote {
+        color: #b0b0b0;
+        border-left-color: #404040;
+    }
+    
+    .av-table {
+        background: #2d2d30;
+        border: 1px solid #404040;
+    }
+    
+    .av-table th {
+        background: #383838;
         color: #cccccc;
+        border-color: #404040;
+    }
+    
+    .av-table td {
+        border-color: #404040;
+    }
+    
+    .av-table tr:hover {
+        background-color: rgba(100, 181, 246, 0.1);
     }
 }
